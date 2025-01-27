@@ -178,9 +178,13 @@ class Puma2D {
 
 		InversKinematyk(start, tmpStart);
 		InversKinematyk(destination, tmpDestination);
+
+
+		glm::vec2 end_1 = { tmpDestination.alfa[0], tmpDestination.beta[0] };
+		glm::vec2 end_2 = { tmpDestination.alfa[1], tmpDestination.beta[1] };
 		std::vector<glm::ivec2> ends = {
-			glm::ivec2{ glm::degrees(tmpDestination.alfa[0]), glm::degrees(tmpDestination.beta[0]) },
-			glm::ivec2{ glm::degrees(tmpDestination.alfa[1]), glm::degrees(tmpDestination.beta[1]) } };
+			glm::ivec2{ glm::degrees(end_1.x), glm::degrees(end_1.y) },
+			glm::ivec2{ glm::degrees(end_2.x), glm::degrees(end_2.y) } };
 
 		auto result = corrdsTexture.Path(glm::ivec2{ glm::degrees(tmpStart.alfa[0]), glm::degrees(tmpStart.beta[0]) }, ends);
 		auto result_2 = corrdsTexture.Path(glm::ivec2{ glm::degrees(tmpStart.alfa[1]), glm::degrees(tmpStart.beta[1]) }, ends);
@@ -197,6 +201,16 @@ class Puma2D {
 		path.clear();
 		for (auto& r : result) {
 			path.push_back({ glm::radians((float)r.x), glm::radians((float)r.y) });
+		}
+		
+		if (path.size() > 0)
+		{
+			if (MathOperations::PowDistance(end_1, path[path.size() - 1]) > MathOperations::PowDistance(end_2, path[path.size() - 1])) {
+				path.push_back(end_2);
+			}
+			else {
+				path.push_back(end_1);
+			}
 		}
 
 		corrdsTexture.RecreatedTexture();
@@ -215,22 +229,29 @@ public:
 		return { mid, end };
 	}
 
-	bool ErrorMgWindow() {
+	bool ErrorMgWindow(float w, float h) {
 		if (!settings.reachEnd) {
 			ImGui::SetNextWindowSize({ 400, 50 });
-			ImGui::Begin("Cant Reach", 0, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar);
-			{
+		}
+		else {
+			ImGui::SetNextWindowSize({ 0, 0 });
+		}
+
+		ImGui::Begin("Cant Reach", 0, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar);
+		{
+			ImGui::SetWindowPos({ w * 2, h * 2 });
+			if (!settings.reachEnd) {
+				ImGui::SetWindowPos({ 0, 0 });
 				ImGui::SetWindowFontScale(1.5f);
 				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
 				ImGui::Text("Can not reach point (%.2f; %.2f)", currentTarget.x, currentTarget.y);
 				ImGui::PopStyleColor();
 			}
-			ImGui::End();
-			ImGui::SetWindowFocus();
-			return true;
 		}
-		return false;
+		ImGui::End();
+		return !settings.reachEnd;
 	}
+	
 
 	bool UserInterfers(Obsticles& obsticles) {
 		bool somethingChanged = false;
@@ -344,8 +365,10 @@ public:
 					float t = step - (int)step;
 					value = first * (1 - t) + second * t;
 				}
-
+				Settings tmp = settings;
 				SetAngles(value.x, value.y);
+				if (isnan(settings.actualEnd.x) || isnan(settings.actualEnd.y))
+					settings = tmp;
 			}
 		}
 

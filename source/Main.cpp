@@ -54,7 +54,7 @@ int main()
 		ImGui::Begin("Puma"); {
 			puma.UserInterfers(obsticles);
 		}
-		puma.ErrorMgWindow();
+		puma.ErrorMgWindow(width, height);
 		ImGui::End();
 		obsticles.Draw();
 		puma.Draw(true);
