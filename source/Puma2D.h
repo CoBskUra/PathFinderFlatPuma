@@ -348,7 +348,7 @@ public:
 		return false;
 	}
 
-	void Draw( bool showBotheSolutions = true) {
+	void Draw(bool showOnlyIfReach = true, Obsticles* o = NULL ) {
 		if (runAinmation ) {
 			step += deltaTime.GetDeltaTime_s() * speed;
 			if (step >= path.size()) {
@@ -366,17 +366,20 @@ public:
 					value = first * (1 - t) + second * t;
 				}
 				Settings tmp = settings;
-				SetAngles(value.x, value.y);
-				if (isnan(settings.actualEnd.x) || isnan(settings.actualEnd.y))
-					settings = tmp;
+				auto mid_end = TakeMidleAndEndPoint(value.x, value.y);
+				auto zero = glm::vec2{ 0, 0 };
+				DrawOne(zero, mid_end.first, mid_end.second, {0, 0, 1});
+				
+
 			}
 		}
+		else {
 
-
-		DrawOne(0, { 1, 0, 0 });
-		if(showBotheSolutions)
-			DrawOne(1, { 0, 1, 0 });
-
+			if (!showOnlyIfReach || (o == NULL || !IsIntersect({ 0,0 }, settings.midlePos[0], settings.actualEnd, *o)))
+				DrawOne(0, { 1, 0, 0 });
+			if (!showOnlyIfReach || (o == NULL || !IsIntersect({ 0,0 }, settings.midlePos[1], settings.actualEnd, *o)))
+				DrawOne(1, { 0, 1, 0 });
+		}
 
 		glPointSize(10.0f);
 
@@ -389,15 +392,21 @@ public:
 	}
 
 	void DrawOne(int id, glm::vec3 color) {
+		auto zero = glm::vec2{ 0,0 };
+		DrawOne(zero, settings.midlePos[id], settings.actualEnd, color);
+		
+	}
+
+	void DrawOne(glm::vec2& start, glm::vec2& mid, glm::vec2& end, glm::vec3 color) {
 		glBegin(GL_LINES);
 		{
 			glColor3f(color.r, color.g, color.b);
-			glVertex2f(0.0f, 0.0f);
-			glVertex2f(settings.midlePos[id].x, settings.midlePos[id].y);
+			glVertex2f(start.x, start.y);
+			glVertex2f(mid.x, mid.y);
 			color = color * 0.6f;
 			glColor3f(color.r, color.g, color.b);
-			glVertex2f(settings.midlePos[id].x, settings.midlePos[id].y);
-			glVertex2f(settings.actualEnd.x, settings.actualEnd.y);
+			glVertex2f(mid.x, mid.y);
+			glVertex2f(end.x, end.y);
 		}
 		glEnd();
 	}
@@ -479,19 +488,14 @@ public:
 	}
 
 	void RevaluatedCorrds(Obsticles& obsticles) {
-		glm::vec2 zero{ 0,0 };
+		glm::vec2 zero{ 0, 0 };
 		for (int i = 0; i < corrdsTexture.width; i++) {
 			float alfa = 2.0f * M_PI * static_cast<float>(i) / static_cast<float>(360);
 			for (int j = 0; j < corrdsTexture.height; j++) {
 				float beta = 2.0f * M_PI * static_cast<float>(j) / static_cast<float>(360);
 				auto pair = TakeMidleAndEndPoint(alfa, beta);
-				corrdsTexture.Set(i, j, 
-					!obsticles.IsInside(zero) &&
-					!obsticles.IsInside(pair.first) &&
-					!obsticles.IsInside(pair.second) &&
-
-					!obsticles.IsIntersect(zero, pair.first) &&
-					!obsticles.IsIntersect(pair.first, pair.second) 
+				corrdsTexture.Set(i, j,
+					!IsIntersect(zero, pair.first, pair.second, obsticles)
 					? 1 : 0);
 			}
 		}
@@ -509,6 +513,16 @@ public:
 		InversKinematyk(newDestination, settings);
 		destination = newDestination;
 	}
+	bool IsIntersect(glm::vec2 start, glm::vec2 mid, glm::vec2 end, Obsticles& obsticles) {
+		
+		return 
+			obsticles.IsInside(start) ||
+			obsticles.IsInside(mid) ||
+			obsticles.IsInside(end) ||
 
+			obsticles.IsIntersect(start, mid) ||
+			obsticles.IsIntersect(mid, end);
+	}
+	
 
 };

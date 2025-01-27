@@ -57,7 +57,7 @@ int main()
 		puma.ErrorMgWindow(width, height);
 		ImGui::End();
 		obsticles.Draw();
-		puma.Draw(true);
+		puma.Draw(true, &obsticles);
 
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
