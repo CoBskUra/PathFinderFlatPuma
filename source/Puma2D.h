@@ -159,7 +159,7 @@ class Puma2D {
 	std::vector<glm::vec2> path;
 	DeltaTime deltaTime{};
 	float lastTime = 0;
-	bool runAinmation = false;
+	bool runAnimation = false;
 	float step = 0;
 	
 	bool AnglesDragFloat(const char* name, float& angle, float mini, float max) {
@@ -300,17 +300,17 @@ public:
 				
 				//somethingChanged = true;
 			}
-			if (!runAinmation && ImGui::Button("Start")) {
-				runAinmation = true;
-				deltaTime.Reset();
-				lastTime = 0;
+			if (!runAnimation && ImGui::Button("Start")) {
 				if (step >= path.size() - 1) {
 					step = 0;
 					FindPath(obsticles);
 				}
+				runAnimation = true;
+				lastTime = 0;
+				deltaTime.Reset();
 			}
-			if (runAinmation && ImGui::Button("Stop")) {
-				runAinmation = false; 
+			if (runAnimation && ImGui::Button("Stop")) {
+				runAnimation = false; 
 			}
 
 			ImGui::SameLine();
@@ -349,28 +349,44 @@ public:
 	}
 
 	void Draw(bool showOnlyIfReach = true, Obsticles* o = NULL ) {
-		if (runAinmation ) {
+		if (runAnimation ) {
 			step += deltaTime.GetDeltaTime_s() * speed;
 			if (step >= path.size()) {
-				runAinmation = false;
+				runAnimation = false;
 				step = path.size() - 1;
+			}
+			else if (step < 0) {
+				runAnimation = false;
+				step = 0;
 			}
 			if (path.size() > 0)
 			{
-
 				auto first = path[(int)step];
 				glm::vec2 value = first;
 				if ((int)step < path.size() - 1) {
 					auto second = path[(int)step + 1];
 					float t = step - (int)step;
+					auto diff = first - second;
+					if (diff.x < -M_PI)
+						first.x += 2 * M_PI;
+					else if(diff.x > M_PI)
+						first.x -= 2 * M_PI;
+					if (diff.y < -M_PI)
+						first.y += 2 * M_PI;
+					else if (diff.y > M_PI)
+						first.y -= 2 * M_PI;
+					
 					value = first * (1 - t) + second * t;
 				}
-				Settings tmp = settings;
-				auto mid_end = TakeMidleAndEndPoint(value.x, value.y);
-				auto zero = glm::vec2{ 0, 0 };
-				DrawOne(zero, mid_end.first, mid_end.second, {0, 0, 1});
-				
 
+				auto mid_end = TakeMidleAndEndPoint(value.x, value.y);
+				
+				auto zero = glm::vec2{ 0, 0 };
+				if (value.x > 350) {
+					std::cout<<"cos";
+				}
+				DrawOne(zero, mid_end.first, mid_end.second, {0, 0, 1});
+				SetAngles(value.x, value.y);
 			}
 		}
 		else {
