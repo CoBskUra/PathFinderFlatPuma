@@ -79,6 +79,7 @@ public:
 
 		std::queue<glm::ivec2> Q;
 		Q.push(start);
+		Set(start.x, start.y, -1);
 		int id = -1;
 		bool found = false;
 		while (!Q.empty()) {
@@ -87,8 +88,9 @@ public:
 			id = GetId(pos.x, pos.y);
 			if (valueParent[id].value < 1)
 				continue;
-			valueParent[id].value = 0.2f;
-			
+			valueParent[id].value = 0.3;
+			//
+
 			if (std::any_of(ends.begin(), ends.end(), [=](glm::ivec2& a) { return id == GetId(a.x, a.y); })) {
 				found = true;
 				break;
@@ -99,24 +101,28 @@ public:
 			if (valueParent[kidId].parentId == -1) {
 				valueParent[kidId].parentId = id;
 				Q.push(kid);
+				Set(kid.x, kid.y, Get(pos.x, pos.y) - 1);
 			}
 			kid = glm::ivec2{ MathOperations::Wrap(pos.x - 1, 0, width), pos.y };
 			kidId = GetId(kid.x, kid.y);
 			if (valueParent[kidId].parentId == -1) {
 				valueParent[kidId].parentId = id;
 				Q.push(kid);
+				Set(kid.x, kid.y, Get(pos.x, pos.y) - 1);
 			}
 			kid = glm::ivec2{ pos.x, MathOperations::Wrap(pos.y + 1, 0, height) };
 			kidId = GetId(kid.x, kid.y);
 			if (valueParent[kidId].parentId == -1) {
 				valueParent[kidId].parentId = id;
 				Q.push(kid);
+				Set(kid.x, kid.y, Get(pos.x, pos.y) - 1);
 			}
 			kid = glm::ivec2{ pos.x, MathOperations::Wrap(pos.y - 1, 0, height) };
 			kidId = GetId(kid.x, kid.y);
 			if (valueParent[kidId].parentId == -1) {
 				valueParent[kidId].parentId = id;
 				Q.push(kid);
+				Set(kid.x, kid.y, Get(pos.x, pos.y) - 1);
 			}
 
 		}
@@ -132,11 +138,24 @@ public:
 			result.push_back(GetXY(startId));
 
 		std::reverse(result.begin(), result.end());
+
+		float size = result.size();
+		for (int i = 0; i < corrdsMax * corrdsMax; i++) {
+			if (data[i] < 0) {
+				float t = static_cast<float>(-data[i] - 1) / size;
+				data[i] = t;
+			}
+		}
+
 		return result;
 	}
 
-	void Draw(std::vector<glm::ivec2> points, float value) {
-		for (auto& p : points) {
+	void Draw(std::vector<glm::ivec2> points, float min, float max) {
+		float size = points.size();
+		for (int i = 0; i < points.size(); i++) {
+			float t = float(i) / size;
+			float value = min * (1 - t) + max * t;
+			auto p = points[i];
 			Set(p.x, p.y, value);
 		}
 	}
@@ -161,6 +180,7 @@ class Puma2D {
 	float lastTime = 0;
 	bool runAnimation = false;
 	float step = 0;
+	bool selectRed = true;
 	
 	bool AnglesDragFloat(const char* name, float& angle, float mini, float max) {
 		float degree = glm::degrees(angle);
@@ -171,7 +191,7 @@ class Puma2D {
 		return false;
 	}
 
-	void FindPath(Obsticles& obsticles){
+	void FindPath(Obsticles& obsticles, bool red){
 		RevaluatedCorrds(obsticles);
 		Settings tmpStart = settings;
 		Settings tmpDestination = settings;
@@ -186,23 +206,25 @@ class Puma2D {
 			glm::ivec2{ glm::degrees(end_1.x), glm::degrees(end_1.y) },
 			glm::ivec2{ glm::degrees(end_2.x), glm::degrees(end_2.y) } };
 
-		auto result = corrdsTexture.Path(glm::ivec2{ glm::degrees(tmpStart.alfa[0]), glm::degrees(tmpStart.beta[0]) }, ends);
-		auto result_2 = corrdsTexture.Path(glm::ivec2{ glm::degrees(tmpStart.alfa[1]), glm::degrees(tmpStart.beta[1]) }, ends);
-		if ((result_2.size() > 0 && result_2.size() < result.size()) ||
-			result.size() == 0) {
-			result = result_2;
-		}
+
+		std::vector<glm::ivec2> result;
+		if(red)
+			result = corrdsTexture.Path(glm::ivec2{ glm::degrees(tmpStart.alfa[0]), glm::degrees(tmpStart.beta[0]) }, ends);
+		else
+			result = corrdsTexture.Path(glm::ivec2{ glm::degrees(tmpStart.alfa[1]), glm::degrees(tmpStart.beta[1]) }, ends);
+		
+		
 
 
 
 
-		corrdsTexture.Draw(result, 0.5f);
+		//corrdsTexture.Draw(result, 0.8f, 1.0f);
 
 		path.clear();
 		for (auto& r : result) {
 			path.push_back({ glm::radians((float)r.x), glm::radians((float)r.y) });
 		}
-		
+		// add end
 		if (path.size() > 0)
 		{
 			if (MathOperations::PowDistance(end_1, path[path.size() - 1]) > MathOperations::PowDistance(end_2, path[path.size() - 1])) {
@@ -295,15 +317,24 @@ public:
 				RevaluatedCorrds(obsticles);
 				somethingChanged = true;
 			}
+
+			if (ImGui::RadioButton("Select red", selectRed)) {
+				selectRed = !selectRed;
+			}
+			ImGui::SameLine();
+			if (ImGui::RadioButton("Select green", !selectRed)) {
+				selectRed = !selectRed;
+			}
+
 			if (ImGui::Button("Flod-Fill")) {
-				FindPath(obsticles);
+				FindPath(obsticles, selectRed);
 				
 				//somethingChanged = true;
 			}
 			if (!runAnimation && ImGui::Button("Start")) {
 				if (step >= path.size() - 1) {
 					step = 0;
-					FindPath(obsticles);
+					FindPath(obsticles, selectRed);
 				}
 				runAnimation = true;
 				lastTime = 0;
