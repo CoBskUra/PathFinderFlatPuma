@@ -14,7 +14,7 @@ add_executable (AngleInterpolation "Main.cpp" "Main.h"  "Constants.h" "resource.
   "Transformations/Quaternion.cpp" "Transformations/Transpose.cpp" "Transformations/Transpose.h" "Transformations/TransposeImGui.h" "Transformations/Quaternion.h" "Transformations/QuaternionRotationImGui.cpp" "Transformations/QuaternionRotationImGui.h"
   "Transformations/Rotation.cpp" "Transformations/Rotation.h" "Transformations/RotationImGui.h" "Transformations/Scale.cpp" "Transformations/Scale.h" "Transformations/ScaleImGui.h"
    "Helper/FileManager.h"
- "Puma2D.h" "Obsticles.h" "vector2D.h")
+ "PathFinder/Puma2D.h" "PathFinder/Obsticles.h" "vector2D.h" "PathFinder/Puma2D.cpp" "PathFinder/Rantagle.h" "PathFinder/Rantagle.cpp" "PathFinder/CorrdsTexture.h" "PathFinder/CorrdsTexture.cpp" "PathFinder/Obsticles.cpp")
 
   if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(

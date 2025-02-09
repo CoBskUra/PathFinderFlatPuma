@@ -1,249 +1,66 @@
-#pragma once
-#include<glad/glad.h>
-#include<GLFW/glfw3.h>
-#include<glm/glm.hpp>
-#include<glm/gtc/type_ptr.hpp>
-#include "Constants.h"
-#include "Helper/MathOperations.h"
-#include "ShaderManadement/Texture.h"
-#include "Obsticles.h"
-#include <queue>
-#include <Helper/DeltaTime.h>
+#include "Puma2D.h"
 
-#define corrdsMax 360
+bool Puma2D::AnglesDragFloat(const char* name, float& angle, float mini, float max) {
+	float degree = glm::degrees(angle);
+	if (ImGui::DragFloat(name, &degree, 1.0f, mini, max - M_ESP, "%.2f")) {
+		angle = glm::radians(degree);
+		return true;
+	}
+	return false;
+}
 
-class CorrdsTexture {
-	struct dataMover{
-		float value;
-		int parentId;
-	};
-	std::vector< dataMover> valueParent;
-	float data[corrdsMax * corrdsMax];
-	Texture textureID{ GL_TEXTURE_2D };
-public:
-	const int width = corrdsMax;
-	const int height = corrdsMax;
+void Puma2D::FindPath(Obsticles& obsticles, bool red) {
+	RevaluatedCorrds(obsticles);
+	Settings tmpStart = settings;
+	Settings tmpDestination = settings;
 
-	CorrdsTexture() {
-		valueParent.resize(width * height);
-		for (int i = 0; i < width * height; i++) {
-			data[i] = 0;
-			valueParent[i].value = 0;
-			valueParent[i].parentId = -1;
+	InversKinematyk(start, tmpStart);
+	InversKinematyk(destination, tmpDestination);
+
+
+	glm::vec2 end_1 = { tmpDestination.alfa[0], tmpDestination.beta[0] };
+	glm::vec2 end_2 = { tmpDestination.alfa[1], tmpDestination.beta[1] };
+	std::vector<glm::ivec2> ends = {
+		glm::ivec2{ glm::degrees(end_1.x), glm::degrees(end_1.y) },
+		glm::ivec2{ glm::degrees(end_2.x), glm::degrees(end_2.y) } };
+
+
+	std::vector<glm::ivec2> result;
+	if (red)
+		result = corrdsTexture.Path(glm::ivec2{ glm::degrees(tmpStart.alfa[0]), glm::degrees(tmpStart.beta[0]) }, ends);
+	else
+		result = corrdsTexture.Path(glm::ivec2{ glm::degrees(tmpStart.alfa[1]), glm::degrees(tmpStart.beta[1]) }, ends);
+
+
+
+
+
+
+	//corrdsTexture.Draw(result, 0.8f, 1.0f);
+
+	path.clear();
+	for (auto& r : result) {
+		path.push_back({ glm::radians((float)r.x), glm::radians((float)r.y) });
+	}
+	// add end
+	if (path.size() > 0)
+	{
+		if (MathOperations::PowDistance(end_1, path[path.size() - 1]) > MathOperations::PowDistance(end_2, path[path.size() - 1])) {
+			path.push_back(end_2);
+		}
+		else {
+			path.push_back(end_1);
 		}
 	}
 
+	corrdsTexture.RecreatedTexture();
+}
 
-	void RecreatedTexture() {
-		textureID.Recreat();
-		textureID.Bind();
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINE);
-
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width, height, 0, GL_RED, GL_FLOAT, data);
-		glGenerateMipmap(GL_TEXTURE_2D);
-	}
-
-	void ImGuiTexture(int w = 360, int h = 360) {
-		ImGui::Image((void*)(intptr_t)textureID.ID, ImVec2(w, h));
-	}
-
-	void Set(int x, int y, float v) {
-		data[y * width + x] = v;
-	}
-
-
-	float Get(int x, int y) {
-		return data[y * width + x];
-	}
-
-	int GetId(int x, int y) {
-		return y * width + x;
-	}
-
-	glm::ivec2 GetXY(int id) {
-		int y = id / width;
-		return { id - y * width, y };
-	}
-
-	std::vector<glm::ivec2> Path(glm::ivec2 start, std::vector<glm::ivec2> ends) {
-		for (int i = 0; i < corrdsMax * corrdsMax; i++) {
-			valueParent[i].value = data[i];
-			valueParent[i].parentId = -1;
-		}
-
-		std::queue<glm::ivec2> Q;
-		Q.push(start);
-		Set(start.x, start.y, -1);
-		int id = -1;
-		bool found = false;
-		while (!Q.empty()) {
-			auto pos = Q.front();
-			Q.pop();
-			id = GetId(pos.x, pos.y);
-			if (valueParent[id].value < 1)
-				continue;
-			valueParent[id].value = 0.3;
-			//
-
-			if (std::any_of(ends.begin(), ends.end(), [=](glm::ivec2& a) { return id == GetId(a.x, a.y); })) {
-				found = true;
-				break;
-			}
-
-			auto kid = glm::ivec2{ MathOperations::Wrap(pos.x + 1, 0, width), pos.y };
-			int kidId = GetId(kid.x, kid.y);
-			if (valueParent[kidId].parentId == -1) {
-				valueParent[kidId].parentId = id;
-				Q.push(kid);
-				Set(kid.x, kid.y, Get(pos.x, pos.y) - 1);
-			}
-			kid = glm::ivec2{ MathOperations::Wrap(pos.x - 1, 0, width), pos.y };
-			kidId = GetId(kid.x, kid.y);
-			if (valueParent[kidId].parentId == -1) {
-				valueParent[kidId].parentId = id;
-				Q.push(kid);
-				Set(kid.x, kid.y, Get(pos.x, pos.y) - 1);
-			}
-			kid = glm::ivec2{ pos.x, MathOperations::Wrap(pos.y + 1, 0, height) };
-			kidId = GetId(kid.x, kid.y);
-			if (valueParent[kidId].parentId == -1) {
-				valueParent[kidId].parentId = id;
-				Q.push(kid);
-				Set(kid.x, kid.y, Get(pos.x, pos.y) - 1);
-			}
-			kid = glm::ivec2{ pos.x, MathOperations::Wrap(pos.y - 1, 0, height) };
-			kidId = GetId(kid.x, kid.y);
-			if (valueParent[kidId].parentId == -1) {
-				valueParent[kidId].parentId = id;
-				Q.push(kid);
-				Set(kid.x, kid.y, Get(pos.x, pos.y) - 1);
-			}
-
-		}
-
-		std::vector<glm::ivec2> result{};
-
-		int startId = GetId(start.x, start.y);
-		while (found && id != startId) {
-			result.push_back(GetXY(id));
-			id = valueParent[id].parentId;
-		}
-		if(found)
-			result.push_back(GetXY(startId));
-
-		std::reverse(result.begin(), result.end());
-
-		float size = result.size();
-		for (int i = 0; i < corrdsMax * corrdsMax; i++) {
-			if (data[i] < 0) {
-				float t = static_cast<float>(-data[i] - 1) / size;
-				data[i] = t;
-			}
-		}
-
-		return result;
-	}
-
-	void Draw(std::vector<glm::ivec2> points, float min, float max) {
-		float size = points.size();
-		for (int i = 0; i < points.size(); i++) {
-			float t = float(i) / size;
-			float value = min * (1 - t) + max * t;
-			auto p = points[i];
-			Set(p.x, p.y, value);
-		}
-	}
-};
-
-class Puma2D {
-	struct Settings {
-		float alfa[2] = { 0, 0 }, beta[2] = { 0, 0 };
-		float L1 = 1, L2 = 1;
-		glm::vec2 midlePos[2];
-		glm::vec2 actualEnd{};
-		bool reachEnd = true;
-	};
-	Settings settings{};
-	CorrdsTexture corrdsTexture{};
-	glm::vec2 destination;
-	glm::vec2 start;
-	glm::vec2 currentTarget;
-	float speed = 1.0f;
-	std::vector<glm::vec2> path;
-	DeltaTime deltaTime{};
-	float lastTime = 0;
-	bool runAnimation = false;
-	float step = 0;
-	bool selectRed = true;
-	
-	bool AnglesDragFloat(const char* name, float& angle, float mini, float max) {
-		float degree = glm::degrees(angle);
-		if (ImGui::DragFloat(name, &degree, 1.0f, mini, max - M_ESP, "%.2f")) {
-			angle = glm::radians(degree);
-			return true;
-		}
-		return false;
-	}
-
-	void FindPath(Obsticles& obsticles, bool red){
-		RevaluatedCorrds(obsticles);
-		Settings tmpStart = settings;
-		Settings tmpDestination = settings;
-
-		InversKinematyk(start, tmpStart);
-		InversKinematyk(destination, tmpDestination);
-
-
-		glm::vec2 end_1 = { tmpDestination.alfa[0], tmpDestination.beta[0] };
-		glm::vec2 end_2 = { tmpDestination.alfa[1], tmpDestination.beta[1] };
-		std::vector<glm::ivec2> ends = {
-			glm::ivec2{ glm::degrees(end_1.x), glm::degrees(end_1.y) },
-			glm::ivec2{ glm::degrees(end_2.x), glm::degrees(end_2.y) } };
-
-
-		std::vector<glm::ivec2> result;
-		if(red)
-			result = corrdsTexture.Path(glm::ivec2{ glm::degrees(tmpStart.alfa[0]), glm::degrees(tmpStart.beta[0]) }, ends);
-		else
-			result = corrdsTexture.Path(glm::ivec2{ glm::degrees(tmpStart.alfa[1]), glm::degrees(tmpStart.beta[1]) }, ends);
-		
-		
-
-
-
-
-		//corrdsTexture.Draw(result, 0.8f, 1.0f);
-
-		path.clear();
-		for (auto& r : result) {
-			path.push_back({ glm::radians((float)r.x), glm::radians((float)r.y) });
-		}
-		// add end
-		if (path.size() > 0)
-		{
-			if (MathOperations::PowDistance(end_1, path[path.size() - 1]) > MathOperations::PowDistance(end_2, path[path.size() - 1])) {
-				path.push_back(end_2);
-			}
-			else {
-				path.push_back(end_1);
-			}
-		}
-
-		corrdsTexture.RecreatedTexture();
-	}
-
-public:
-	glm::vec2 Pos(float a, float b) {
+glm::vec2 Puma2D::Pos(float a, float b) {
 		return (RotationMatrix(a) * TransMatrix_X(settings.L1) * RotationMatrix(b) * TransMatrix_X(settings.L2))[2];
 	}
 
-	std::pair<glm::vec2, glm::vec2> TakeMidleAndEndPoint(float a, float b)
+	std::pair<glm::vec2, glm::vec2> Puma2D::TakeMidleAndEndPoint(float a, float b)
 	{
 		glm::mat3 trans = RotationMatrix(a) * TransMatrix_X(settings.L1);
 		glm::vec2 mid = trans[2];
@@ -251,7 +68,7 @@ public:
 		return { mid, end };
 	}
 
-	bool ErrorMgWindow(float w, float h) {
+	bool Puma2D::ErrorMgWindow(float w, float h) {
 		if (!settings.reachEnd) {
 			ImGui::SetNextWindowSize({ 400, 50 });
 		}
@@ -275,7 +92,7 @@ public:
 	}
 	
 
-	bool UserInterfers(Obsticles& obsticles) {
+	bool Puma2D::UserInterfers(Obsticles& obsticles) {
 		bool somethingChanged = false;
 		ImGui::BeginGroup(); {
 			if(ImGui::DragFloat("First Arm", &settings.L1, 0.1f)) somethingChanged = true;
@@ -332,11 +149,12 @@ public:
 				//somethingChanged = true;
 			}
 			if (!runAnimation && ImGui::Button("Start")) {
-				if (step >= path.size() - 1) {
+				if (step >= path.size() - 1 || step <= 0) {
 					step = 0;
-					FindPath(obsticles, selectRed);
+					if(!isnan(start.x) && !isnan(destination.x))
+						FindPath(obsticles, selectRed);
 				}
-				runAnimation = true;
+				runAnimation = !isnan(start.x) && !isnan(destination.x);
 				lastTime = 0;
 				deltaTime.Reset();
 			}
@@ -356,7 +174,7 @@ public:
 		return somethingChanged;
 	}
 
-	bool Inputs(GLFWwindow* window, float width, float height) {
+	bool Puma2D::Inputs(GLFWwindow* window, float width, float height) {
 		if (ImGui::GetIO().WantCaptureMouse)
 			return false;
 
@@ -379,7 +197,7 @@ public:
 		return false;
 	}
 
-	void Draw(bool showOnlyIfReach = true, Obsticles* o = NULL ) {
+	void Puma2D::Draw(bool showOnlyIfReach, Obsticles* o ) {
 		if (runAnimation ) {
 			step += deltaTime.GetDeltaTime_s() * speed;
 			if (step >= path.size()) {
@@ -438,13 +256,13 @@ public:
 		glEnd();
 	}
 
-	void DrawOne(int id, glm::vec3 color) {
+	void Puma2D::DrawOne(int id, glm::vec3 color) {
 		auto zero = glm::vec2{ 0,0 };
 		DrawOne(zero, settings.midlePos[id], settings.actualEnd, color);
 		
 	}
 
-	void DrawOne(glm::vec2& start, glm::vec2& mid, glm::vec2& end, glm::vec3 color) {
+	void Puma2D::DrawOne(glm::vec2& start, glm::vec2& mid, glm::vec2& end, glm::vec3 color) {
 		glBegin(GL_LINES);
 		{
 			glColor3f(color.r, color.g, color.b);
@@ -458,7 +276,7 @@ public:
 		glEnd();
 	}
 
-	void InversKinematyk(glm::vec2 endPos, Settings& toSetSettings) {
+	void Puma2D::InversKinematyk(glm::vec2 endPos, Settings& toSetSettings) {
 		float powDis = glm::dot(endPos, endPos);
 		if (powDis >= powf(toSetSettings.L1 + toSetSettings.L2, 2) || powDis <= powf(toSetSettings.L1 - toSetSettings.L2, 2)) {
 
@@ -514,7 +332,7 @@ public:
 		toSetSettings.midlePos[1] = RotationMatrix(toSetSettings.alfa[1]) * TransMatrix_X(toSetSettings.L1) * glm::vec3(0, 0, 1);
 	}
 
-	glm::mat3 RotationMatrix(float angle) {
+	glm::mat3 Puma2D::RotationMatrix(float angle) {
 		float s = sinf(angle);
 		float c = cosf(angle);
 		glm::mat3 result{ 1.f };
@@ -527,14 +345,14 @@ public:
 		return result;
 	}
 
-	glm::mat3 TransMatrix_X(float t) {
+	glm::mat3 Puma2D::TransMatrix_X(float t) {
 		glm::mat3 result{ 1 };
 		result[2][2] = 1;
 		result[2][0] = t;
 		return result;
 	}
 
-	void RevaluatedCorrds(Obsticles& obsticles) {
+	void Puma2D::RevaluatedCorrds(Obsticles& obsticles) {
 		glm::vec2 zero{ 0, 0 };
 		for (int i = 0; i < corrdsTexture.width; i++) {
 			float alfa = 2.0f * M_PI * static_cast<float>(i) / static_cast<float>(360);
@@ -549,18 +367,18 @@ public:
 		corrdsTexture.RecreatedTexture();
 	}
 
-	void SetAngles(float alfa, float beta) {
+	void Puma2D::SetAngles(float alfa, float beta) {
 		auto end = TakeMidleAndEndPoint(alfa, beta).second;
 		InversKinematyk(end, settings);
 		currentTarget = end;
 		settings.reachEnd = true;
 	}
 
-	void SetDestination(glm::vec2 newDestination) {
+	void Puma2D::SetDestination(glm::vec2 newDestination) {
 		InversKinematyk(newDestination, settings);
 		destination = newDestination;
 	}
-	bool IsIntersect(glm::vec2 start, glm::vec2 mid, glm::vec2 end, Obsticles& obsticles) {
+	bool Puma2D::IsIntersect(glm::vec2 start, glm::vec2 mid, glm::vec2 end, Obsticles& obsticles) {
 		
 		return 
 			obsticles.IsInside(start) ||
@@ -570,6 +388,3 @@ public:
 			obsticles.IsIntersect(start, mid) ||
 			obsticles.IsIntersect(mid, end);
 	}
-	
-
-};

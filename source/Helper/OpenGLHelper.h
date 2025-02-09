@@ -12,7 +12,6 @@ public:
 
 
 	static glm::vec3 RandomVec3() {
-		srand(time(NULL));
 		glm::vec3 result;
 		result.x = static_cast<float>(rand() )/ static_cast<float>( RAND_MAX);
 		result.y = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);

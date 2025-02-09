@@ -3,8 +3,8 @@
 #include <filesystem>
 #include <Helper/ImGuiStyles.h>
 #include <ShaderRefrence/StaticShaders.h>
-#include <Puma2D.h>
-#include <Obsticles.h>
+#include <PathFinder/Puma2D.h>
+#include <PathFinder/Obsticles.h>
 
 unsigned int width = 1024;
 unsigned int height = 1024;
@@ -82,6 +82,7 @@ int main()
 
 
 GLFWwindow* Init() {
+	srand(time(NULL));
 	glfwInit();
 
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
